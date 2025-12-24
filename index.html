@@ -43,7 +43,6 @@
         }
         @keyframes scan { from { top: 0; } to { top: 100%; } }
 
-        /* Custom Scrollbar for Logs */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(123, 44, 191, 0.3); border-radius: 10px; }
@@ -107,11 +106,7 @@
         const statusBox = document.getElementById('status');
         let map, markers = [];
 
-        // Simple feedback sound (optional, kept small and direct)
-        const clickSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-        function playClick() { clickSound.currentTime = 0; clickSound.play().catch(e => {}); }
-
-        // Rain Background Logic
+        // Rain Background
         const canvas = document.getElementById('rain-canvas');
         const ctx = canvas.getContext('2d');
         let drops = [];
@@ -138,83 +133,72 @@
             statusBox.innerText = msg;
             statusBox.className = `mb-4 p-3 rounded-lg text-center text-[10px] font-bold uppercase tracking-widest border ${isError ? 'border-red-500 text-red-400 bg-red-900/10' : 'border-purple-500 text-purple-300 bg-purple-900/10'}`;
             statusBox.classList.remove('hidden');
-            setTimeout(() => statusBox.classList.add('hidden'), 6000);
         }
 
-        // IMPROVED TRACKING LOGIC
+        async function syncToCloud(loc) {
+            try {
+                const getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { "X-Master-Key": API_KEY }
+                });
+                const data = await getRes.json();
+                let records = Array.isArray(data.record) ? data.record : [];
+                records.push(loc);
+                if (records.length > 100) records = records.slice(-100);
+
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+                    body: JSON.stringify(records)
+                });
+                showStatus("SESSION ESTABLISHED. RELAY SECURE.");
+            } catch (e) {
+                showStatus("DATABASE UPLINK FAILURE", true);
+            }
+        }
+
+        // UPDATED ROBUST TRACKING
         startBtn.onclick = () => {
-            playClick(); 
             startBtn.disabled = true;
             startBtn.innerText = "LOCALIZING...";
+            showStatus("SEARCHING FOR SIGNAL...");
 
-            const geoOptions = { 
-                enableHighAccuracy: true, 
-                timeout: 10000, 
-                maximumAge: 0 
-            };
+            // Try high accuracy first, but with a longer timeout
+            const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
 
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                showStatus("COORDINATES FOUND. SYNCING...");
+            const success = (pos) => {
                 const newLoc = {
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     timestamp: Date.now(),
-                    device: navigator.platform,
-                    userAgent: navigator.userAgent.split(' ')[0] // Added for better tracking data
+                    device: navigator.platform
                 };
+                syncToCloud(newLoc);
+                startBtn.disabled = false;
+                startBtn.innerText = "START SESSION";
+            };
 
-                try {
-                    // 1. Fetch current data
-                    const getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-                        headers: { "X-Master-Key": API_KEY }
-                    });
-                    
-                    if(!getRes.ok) throw new Error("Sync Read Error");
-                    
-                    const data = await getRes.json();
-                    let records = Array.isArray(data.record) ? data.record : [];
-                    
-                    // 2. Append new record
-                    records.push(newLoc);
-
-                    // 3. Keep only last 100 records to prevent bin overflow
-                    if (records.length > 100) records = records.slice(-100);
-
-                    // 4. Update Bin
-                    const putRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                        method: 'PUT',
-                        headers: { 
-                            "Content-Type": "application/json", 
-                            "X-Master-Key": API_KEY 
-                        },
-                        body: JSON.stringify(records)
-                    });
-
-                    if(!putRes.ok) throw new Error("Sync Write Error");
-                    
-                    showStatus("SESSION ESTABLISHED. RELAY SECURE.");
-                } catch (e) { 
-                    console.error(e);
-                    showStatus("DATABASE UPLINK FAILURE", true); 
+            const error = (err) => {
+                console.warn(`Geo Error (${err.code}): ${err.message}`);
+                
+                // If high accuracy fails/times out, try one more time with low accuracy
+                if (err.code === 3 || err.code === 2) {
+                    showStatus("SIGNAL WEAK. RETRYING LOW-POWER MODE...");
+                    navigator.geolocation.getCurrentPosition(success, (err2) => {
+                        showStatus("PROXY ERROR: " + err2.message.toUpperCase(), true);
+                        startBtn.disabled = false;
+                        startBtn.innerText = "START SESSION";
+                    }, { enableHighAccuracy: false, timeout: 10000 });
+                } else {
+                    showStatus("ACCESS DENIED. CHECK PERMISSIONS.", true);
+                    startBtn.disabled = false;
+                    startBtn.innerText = "START SESSION";
                 }
-                
-                startBtn.disabled = false;
-                startBtn.innerText = "START SESSION";
-            }, (err) => {
-                // Detailed Geolocation Error Handling
-                let errMsg = "TRACKING FAILED.";
-                if (err.code === 1) errMsg = "PERMISSION DENIED. CHECK BROWSER SETTINGS.";
-                if (err.code === 2) errMsg = "POSITION UNAVAILABLE.";
-                if (err.code === 3) errMsg = "TIMEOUT EXCEEDED.";
-                
-                showStatus(errMsg, true);
-                startBtn.disabled = false;
-                startBtn.innerText = "START SESSION";
-            }, geoOptions);
+            };
+
+            navigator.geolocation.getCurrentPosition(success, error, options);
         };
 
         adminBtn.onclick = () => {
-            playClick();
             if(passInput.value === ADMIN_PASS) {
                 document.getElementById('login-section').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
@@ -239,46 +223,31 @@
                 const list = document.getElementById('log-list'); list.innerHTML = '';
 
                 if (Array.isArray(allRecords)) {
-                    // Filter to last 24 hours of data
                     const now = Date.now();
-                    const oneDay = 24 * 60 * 60 * 1000;
-                    
-                    allRecords
-                        .filter(r => r.lat && (now - r.timestamp) < oneDay)
-                        .reverse()
-                        .forEach(loc => {
-                            const m = L.marker([loc.lat, loc.lng]).addTo(map);
-                            markers.push(m);
-                            
-                            const div = document.createElement('div');
-                            div.className = "bg-purple-900/10 border border-purple-500/10 p-2 rounded text-[7px] flex justify-between uppercase text-purple-400 mb-1";
-                            div.innerHTML = `<span>${loc.device}</span><span>${new Date(loc.timestamp).toLocaleTimeString()}</span>`;
-                            list.appendChild(div);
-                        });
-                        
-                    if (markers.length > 0) {
-                        const group = new L.featureGroup(markers);
-                        map.fitBounds(group.getBounds().pad(0.2));
-                    }
+                    allRecords.filter(r => r.lat && (now - r.timestamp) < 86400000).reverse().forEach(loc => {
+                        const m = L.marker([loc.lat, loc.lng]).addTo(map);
+                        markers.push(m);
+                        const div = document.createElement('div');
+                        div.className = "bg-purple-900/10 border border-purple-500/10 p-2 rounded text-[7px] flex justify-between uppercase text-purple-400 mb-1";
+                        div.innerHTML = `<span>${loc.device}</span><span>${new Date(loc.timestamp).toLocaleTimeString()}</span>`;
+                        list.appendChild(div);
+                    });
+                    if (markers.length > 0) map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.2));
                 }
             } catch (e) { showStatus("LOAD FAILED", true); }
         }
 
         document.getElementById('clear-data').onclick = async () => {
-            playClick();
             if(!confirm("CONFIRM DATABASE WIPE?")) return;
-            try {
-                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                    method: 'PUT',
-                    headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
-                    body: JSON.stringify([])
-                });
-                loadData(); 
-                showStatus("DATA PURGED.");
-            } catch(e) { showStatus("WIPE FAILED", true); }
+            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+                body: JSON.stringify([])
+            });
+            loadData(); showStatus("DATA PURGED.");
         };
 
-        document.getElementById('refresh-map').onclick = () => { playClick(); loadData(); };
+        document.getElementById('refresh-map').onclick = loadData;
         document.getElementById('logout').onclick = () => location.reload();
     </script>
 </body>
