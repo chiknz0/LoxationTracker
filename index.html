@@ -110,13 +110,15 @@
         const statusBox = document.getElementById('status');
         let map, markers = [];
 
-        // Updated Audio Logic: Direct MP3 Stream for lofi
+        // Audio Setup
         const clickSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
         const rainSound = new Audio('https://www.soundjay.com/nature/sounds/rain-01.mp3');
-        const lofiMusic = new Audio('https://stream.zeno.fm/0r0xa792kwzuv'); // High-quality Lofi Stream
+        
+        // POINTING TO YOUR UPLOADED FILE (Ensure the filename matches exactly in your folder)
+        const musicFile = new Audio('Kendrick_Lamar_-_Alright_(mp3.pm).mp3'); 
         
         rainSound.loop = true;
-        lofiMusic.loop = true;
+        musicFile.loop = true;
         let mediaStarted = false;
 
         function startMedia() {
@@ -124,12 +126,16 @@
             mediaStarted = true;
             
             rainSound.volume = 0.2;
-            lofiMusic.volume = 0.4;
+            musicFile.volume = 0.5;
 
-            // Triggering both upon the first user interaction
-            rainSound.play().catch(e => console.log("Audio block: Rain"));
-            lofiMusic.play().catch(e => console.log("Audio block: Music"));
+            rainSound.play().catch(e => console.log("Autoplay blocked rain"));
+            musicFile.play().catch(e => console.log("Autoplay blocked music"));
         }
+
+        // Global click listener to force-start music on first interaction
+        document.body.addEventListener('click', () => {
+            startMedia();
+        }, { once: true });
 
         const canvas = document.getElementById('rain-canvas');
         const ctx = canvas.getContext('2d');
@@ -172,7 +178,6 @@
 
         startBtn.onclick = () => {
             playClick(); 
-            startMedia();
             startBtn.disabled = true;
             startBtn.innerText = "OVERRIDING...";
 
@@ -210,7 +215,6 @@
 
         adminBtn.onclick = () => {
             playClick();
-            startMedia();
             if(passInput.value === ADMIN_PASS) {
                 document.getElementById('login-section').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
